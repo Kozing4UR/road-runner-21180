@@ -8,6 +8,7 @@ import com.qualcomm.robotcore.eventloop.opmode.LinearOpMode;
 
 import org.firstinspires.ftc.teamcode.MecanumDrive;
 import org.firstinspires.ftc.teamcode.TankDrive;
+import org.firstinspires.ftc.teamcode.ThreeDeadWheelLocalizer;
 
 public class LocalizationTest extends LinearOpMode {
     @Override
@@ -31,15 +32,17 @@ public class LocalizationTest extends LinearOpMode {
                 telemetry.addData("left back pos", drive.leftBack.getCurrentPosition());
                 telemetry.addData("right front pos", drive.rightFront.getCurrentPosition());
                 telemetry.addData("right back pos", drive.rightBack.getCurrentPosition());
-                MecanumDrive.DriveLocalizer dl = (MecanumDrive.DriveLocalizer) drive.localizer;
-                telemetry.addData("left front enc", dl.leftFront.getPositionAndVelocity().position);
-                telemetry.addData("left rear enc", dl.leftRear.getPositionAndVelocity().position);
-                telemetry.addData("right front enc", dl.rightFront.getPositionAndVelocity().position);
-                telemetry.addData("right rear enc", dl.rightRear.getPositionAndVelocity().position);
 
+                if (drive.localizer.equals(ThreeDeadWheelLocalizer.class)) {
+                    ThreeDeadWheelLocalizer dl = (ThreeDeadWheelLocalizer) drive.localizer;
+                    telemetry.addData("par0 pos = ", dl.par0.getPositionAndVelocity().position);
+                    telemetry.addData("par1 pos = ", dl.par1.getPositionAndVelocity().position);
+                    telemetry.addData("perp pos = ", dl.perp.getPositionAndVelocity().position);
+                }
                 telemetry.addData("x", drive.pose.position.x);
                 telemetry.addData("y", drive.pose.position.y);
                 telemetry.addData("heading", drive.pose.heading);
+                telemetry.addData("heading", Math.toDegrees(drive.pose.heading.log()));
                 telemetry.update();
             }
         } else if (TuningOpModes.DRIVE_CLASS.equals(TankDrive.class)) {

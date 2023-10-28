@@ -66,9 +66,9 @@ public class TeleopRR extends LinearOpMode {
     MecanumDrive mecanum;
 
     //claw and arm unit
-    private final ArmClawUnit armClaw = new ArmClawUnit();
+    private intakeUnit intake;
 
-    private Servo launchServo = null;
+    private Servo launchServo;
 
     // debug flags, turn it off for formal version to save time of logging
     boolean debugFlag = true;
@@ -79,17 +79,20 @@ public class TeleopRR extends LinearOpMode {
 
         GamePadButtons gpButtons = new GamePadButtons();
 
-        mecanum = new MecanumDrive(hardwareMap, Params.currentPose);
 
+        mecanum = new MecanumDrive(hardwareMap, Params.currentPose);
         mecanum.setMode(DcMotor.RunMode.RUN_WITHOUT_ENCODER);
 
-        armClaw.init(hardwareMap, "ArmMotor", "ClawServo");
+        intake = new intakeUnit(hardwareMap, "ArmMotor", "WristServo",
+                "FingerServo", "SwitchServo");
 
-        armClaw.resetArmEncoder();
+        //intake.resetArmEncoder();
 
-        launchServo = hardwareMap.get(Servo.class, "LaunchServo");
+        //launchServo = hardwareMap.get(Servo.class, "LaunchServo");
+
 
         launchServo.setPosition(0.95);
+
 
         // bulk reading setting - auto refresh mode
         List<LynxModule> allHubs = hardwareMap.getAll(LynxModule.class);
@@ -102,11 +105,6 @@ public class TeleopRR extends LinearOpMode {
         telemetry.update();
         waitForStart();
         runtime.reset();
-
-        // move slider to wall position just when starting.
-        if (opModeIsActive()) {
-            //slider.setInchPosition(Params.WALL_POSITION);
-        }
 
         // run until the end of the match (driver presses STOP)
         while (opModeIsActive()) {
@@ -124,50 +122,93 @@ public class TeleopRR extends LinearOpMode {
             }
             mecanum.setDrivePowers(new PoseVelocity2d(
                     new Vector2d(
-                            gpButtons.robotDrive * maxDrivePower,
-                            gpButtons.robotStrafe * maxDrivePower
+                            -gpButtons.robotDrive * maxDrivePower,
+                            -gpButtons.robotStrafe * maxDrivePower
                     ),
                     gpButtons.robotTurn * maxDrivePower
             ));
 
             // Set position only when button is hit.
-            if (gpButtons.clawClose) {
-                armClaw.clawClose();
+            if (gpButtons.wristDown) {
+                intake.wristDown();
             }
 
             // Set position only when button is hit.
-            if (gpButtons.clawOpen) {
-                armClaw.clawOpen();
+            if (gpButtons.wristUp) {
+                intake.wristUp();
             }
 
-            if(Math.abs(gpButtons.armManualControl) > 0) {
-                armClaw.armManualMoving(gpButtons.armManualControl);
+            if (gpButtons.fingerOuttake) {
+                intake.fingerOuttake();
+            }
+
+            if (gpButtons.fingerStop) {
+                intake.fingerStop();
+            }
+
+            if (gpButtons.fingerIntake) {
+                intake.fingerIntake();
             }
 
             if (gpButtons.launchOn) {
+
                 launchServo.setPosition(0.0);
+
             }
 
-            if (gpButtons.armLift) {
-                armClaw.armLift();
+            if (gpButtons.accelorate) {
+                if (gpButtons.armLift) {
+                    intake.armLiftAcc();
+                }
+
+                if (gpButtons.armDown) {
+                    intake.armDownAcc();
+                }
+            }
+            else {
+                if (gpButtons.armLift) {
+                    intake.armLift();
+                }
+
+                if (gpButtons.armDown) {
+                    intake.armDown();
+                }
             }
 
-            if (gpButtons.armDown) {
-                armClaw.armDown();
+            if(gpButtons.readyToIntake) {
+                intake.intakePositions();
             }
+
+            if(gpButtons.switchOpen) {
+                intake.switchServoOpen();
+            }
+
+            if(gpButtons.switchClose) {
+                intake.switchServoClose();
+            }
+
+            if(gpButtons.dropPosition) {
+                intake.dropPositions();
+            }
+
 
             if (debugFlag) {
                 // claw arm servo log
-                telemetry.addData("Claw", "position %.2f", armClaw.getClawPosition());
+                telemetry.addData("Wrist", "position %.2f", intake.getWristPosition());
+
+                telemetry.addData("Arm", "position = %.2f", intake.getArmPosition());
+
+                telemetry.addData("Finger", "position %.2f", intake.getFingerPosition());
+
+                telemetry.addData("switch", "position %.2f", intake.getSwitchPosition());
 
 
-                telemetry.addData("Arm", "position = %.2f", armClaw.getArmPosition());
-
-                telemetry.addData("Claw", "position %.2f", armClaw.getClawPosition());
-
-                telemetry.addData("Launch", "position %.2f", launchServo.getPosition());
+                //telemetry.addData("Launch", "position %.2f", launchServo.getPosition());
 
                 telemetry.update(); // update message at the end of while loop
+
+                Logging.log("Wrist position %.2f", intake.getWristPosition());
+
             }
         }
 
