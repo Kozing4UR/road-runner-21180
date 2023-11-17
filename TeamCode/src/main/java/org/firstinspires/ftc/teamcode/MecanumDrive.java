@@ -51,7 +51,7 @@ public final class MecanumDrive {
         // Gobilda odometry: 48mm diameter(1.89 inch), 2048 tick per revolution, inPerTick = 0.0029.
         public boolean useDeadWheel = false;
         public double inPerTick = useDeadWheel? 0.00294 : 0.02208155454144; // WHEEL_RADIUS(1.8898) * 2 * Math.PI / TICKS_PER_REV(537.6)
-        public double lateralInPerTick = useDeadWheel? 0.002621639136230116 : 0.0019;
+        public double lateralInPerTick = useDeadWheel? 0.002621639136230116 : 0.019/0.9786;
         public double trackWidthTicks = useDeadWheel? 4799.137772874604 : 650;
 
         // feedforward parameters (in tick units)
@@ -69,9 +69,9 @@ public final class MecanumDrive {
         public double maxAngAccel = Math.PI;
 
         // path controller gains
-        public double axialGain = 5.0; // 0.0
-        public double lateralGain = 1.0;  // 0.0
-        public double headingGain = 15.0; // 0.0; //shared with turn
+        public double axialGain = 9.0; // 0.0
+        public double lateralGain = 8.0;  // 0.0 ; 8 is based on testing without dead wheels
+        public double headingGain = 12.0; // 0.0; //shared with turn
 
         public double axialVelGain = 0.1; // 0.0
         public double lateralVelGain = 0.0;
@@ -203,7 +203,7 @@ public final class MecanumDrive {
 
         imu = hardwareMap.get(IMU.class, "imu");
         IMU.Parameters parameters = new IMU.Parameters(new RevHubOrientationOnRobot(
-                RevHubOrientationOnRobot.LogoFacingDirection.LEFT,
+                RevHubOrientationOnRobot.LogoFacingDirection.UP,
                 RevHubOrientationOnRobot.UsbFacingDirection.FORWARD));
         imu.initialize(parameters);
 

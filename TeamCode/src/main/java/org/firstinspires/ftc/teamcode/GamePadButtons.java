@@ -26,8 +26,7 @@ import com.qualcomm.robotcore.hardware.Gamepad;
  *  Right trigger:  auto drop off cone on high junction then move to cone base
  *  Y:              Teapot function - drop off cone on high junction then pick up cone from base, then move to high junction
  *  Back:           Back to cone base just at the beginning of Teleop
- *  A:              open claw to drop off cone manually.
- *
+ *  A:              open claw to drop off cone manually.*
  * Game pad2:
  *  dpad:
  *      Up:         close the claw to pick up cone
@@ -53,7 +52,7 @@ public class GamePadButtons {
     public float robotTurn;
     public boolean speedDown;
     public boolean speedUp;
-    public boolean armLift;
+    public boolean armUp;
     public boolean armDown;
 
     public boolean wristUp;
@@ -66,40 +65,52 @@ public class GamePadButtons {
     public boolean switchOpen;
     public boolean switchClose;
 
-    public boolean accelorate;
+    public boolean speedCtrl;
 
     public boolean readyToIntake;
-    public boolean dropPosition;
-    public boolean launchOn;
+    public boolean readyToDrop;
+    public boolean launchPlane;
+    public boolean hangingRobot;
 
     public void checkGamepadButtons(@NonNull Gamepad gamepad1, @NonNull Gamepad gamepad2) {
-        //gamepad1 buttons
+        //game pad 1 buttons
+
+        //driving
         robotDrive = gamepad1.left_stick_y;
         robotStrafe = gamepad1.left_stick_x;
         robotTurn = gamepad1.right_stick_x;
 
-        // arm lift
-        armLift = gamepad1.x;
-        armDown = gamepad1.y;
+        //speed controls
+        speedCtrl = gamepad1.back;
+        speedDown = speedCtrl;
 
-        // launch plane
-        launchOn = gamepad1.right_bumper || gamepad2.right_bumper;
+        // game pad 2
 
+        //special presets
+        launchPlane = gamepad2.right_bumper;
+        hangingRobot = gamepad2.left_bumper;
+
+        //back switches
+        switchOpen = gamepad2.b;
+        switchClose = gamepad2.a;
+        
+        //arms
+        armUp = gamepad2.right_stick_y < 0;
+        armDown = gamepad2.right_stick_y > 0;
+
+        //wrists
+        wristUp = gamepad2.left_stick_y < 0;
+        wristDown = gamepad2.left_stick_y > 0;
+
+        //both
+
+        //fingers
         fingerIntake = gamepad1.dpad_down || gamepad2.dpad_down;
         fingerStop = gamepad1.dpad_left || gamepad2.dpad_left;
-        fingerOuttake = gamepad1.dpad_up || gamepad2.dpad_up;;
+        fingerOuttake = gamepad1.dpad_up || gamepad2.dpad_up;
 
-        wristUp = gamepad1.a;
-        wristDown = gamepad1.b;
-
-        switchOpen = (gamepad1.right_trigger > 0);
-        switchClose = (gamepad1.left_trigger > 0);
-
-        readyToIntake = gamepad1.left_bumper;
-
-        dropPosition = gamepad1.right_bumper;
-
-        accelorate = gamepad1.back;
-
+        //preset positions
+        readyToIntake = gamepad1.left_bumper || gamepad2.left_bumper;
+        readyToDrop = gamepad1.right_bumper || gamepad2.right_bumper;
     }
 }

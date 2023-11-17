@@ -24,7 +24,7 @@ public class AprilTagTest {
     private static boolean USE_WEBCAM = true;  // Set true to use a webcam, or false for a phone camera
     private int DESIRED_TAG_ID = -1;     // Choose the tag you want to approach or set to -1 for ANY tag.
     public boolean targetFound = false;    // Set to true when an AprilTag target is detected
-    private final double DESIRED_DISTANCE = 12.0; //  this is how close the camera should get to the target (inches)
+    private final double DESIRED_DISTANCE = 10.0; //  this is how close the camera should get to the target (inches)
 
     //Objects
     private HardwareMap hardwareMap = null;
@@ -230,7 +230,7 @@ public class AprilTagTest {
         }
     }
 
-    public void autoDriveToAprilTag() {
+    public boolean autoDriveToAprilTag() {
         boolean reachedTarget = false;
         int detectCount = 0;
 
@@ -256,5 +256,7 @@ public class AprilTagTest {
             Logging.log("Drive Heading = %2.2f", Math.toDegrees(driveMC.pose.heading.log()));
             Logging.log("Drive position x = %2.2f, y = %2.2f", driveMC.pose.position.x, driveMC.pose.position.y);
         }
+
+        return reachedTarget;
     }
 }
