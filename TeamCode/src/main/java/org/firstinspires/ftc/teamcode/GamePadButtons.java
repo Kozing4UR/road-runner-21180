@@ -63,14 +63,23 @@ public class GamePadButtons {
     public boolean fingerStop;
 
     public boolean switchOpen;
+    public boolean switchDropOne;
     public boolean switchClose;
 
     public boolean speedCtrl;
 
     public boolean readyToIntake;
+    public boolean readyToIntake2nd;
+    public boolean readyToIntake3rd;
+    public boolean readyToIntake4th;
     public boolean readyToDrop;
-    public boolean launchPlane;
+    public boolean droneLaunch;
     public boolean hangingRobot;
+
+    public boolean moveToLeftTag;
+    public boolean moveToCenterTag;
+    public boolean moveToRightTag;
+
 
     public void checkGamepadButtons(@NonNull Gamepad gamepad1, @NonNull Gamepad gamepad2) {
         //game pad 1 buttons
@@ -84,15 +93,20 @@ public class GamePadButtons {
         speedCtrl = gamepad1.back;
         speedDown = speedCtrl;
 
+        moveToLeftTag = gamepad1.x;
+        moveToCenterTag = gamepad1.y;
+        moveToRightTag = gamepad1.b;
+
         // game pad 2
 
         //special presets
-        launchPlane = gamepad2.right_bumper;
-        hangingRobot = gamepad2.left_bumper;
+        droneLaunch = (gamepad2.right_trigger > 0);
+        hangingRobot = (gamepad2.left_trigger > 0);
 
         //back switches
         switchOpen = gamepad2.b;
         switchClose = gamepad2.a;
+        switchDropOne = gamepad2.x;
         
         //arms
         armUp = gamepad2.right_stick_y < 0;
@@ -105,12 +119,15 @@ public class GamePadButtons {
         //both
 
         //fingers
-        fingerIntake = gamepad1.dpad_down || gamepad2.dpad_down;
-        fingerStop = gamepad1.dpad_left || gamepad2.dpad_left;
-        fingerOuttake = gamepad1.dpad_up || gamepad2.dpad_up;
+        fingerIntake =  gamepad2.dpad_down;
+        fingerStop =  gamepad2.dpad_left;
+        fingerOuttake =  gamepad2.dpad_up;
 
         //preset positions
         readyToIntake = gamepad1.left_bumper || gamepad2.left_bumper;
+        readyToIntake2nd = gamepad1.dpad_up;
+        readyToIntake3rd = gamepad1.dpad_left;
+        readyToIntake4th = gamepad1.dpad_down;
         readyToDrop = gamepad1.right_bumper || gamepad2.right_bumper;
     }
 }

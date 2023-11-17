@@ -33,13 +33,20 @@
 
 package org.firstinspires.ftc.teamcode;
 
+import androidx.annotation.NonNull;
+
+import com.acmerobotics.dashboard.telemetry.TelemetryPacket;
+import com.acmerobotics.roadrunner.Action;
+import com.acmerobotics.roadrunner.ParallelAction;
+import com.acmerobotics.roadrunner.SequentialAction;
+import com.acmerobotics.roadrunner.SleepAction;
 import com.acmerobotics.roadrunner.Vector2d;
 import com.acmerobotics.roadrunner.ftc.Actions;
 import com.acmerobotics.roadrunner.Pose2d;
 import com.qualcomm.hardware.lynx.LynxModule;
 import com.qualcomm.robotcore.eventloop.opmode.Autonomous;
 import com.qualcomm.robotcore.eventloop.opmode.LinearOpMode;
-//import com.qualcomm.robotcore.hardware.DcMotor;
+import com.qualcomm.robotcore.hardware.DcMotor;
 import com.qualcomm.robotcore.util.ElapsedTime;
 
 import org.firstinspires.ftc.robotcore.external.hardware.camera.WebcamName;
@@ -83,36 +90,32 @@ public class AutoRedFront extends LinearOpMode {
     /** front: 1; back -1
      */
     private int frontOrBack = 1; // front: 1; back -1
-    /** 1 for left, 2 for center, and 3 for right
+    /**
+     * blue: 1,2,3; red: 4,5,6
      */
-    public int spikeMarkLoc = 1; // 1 for left, 2 for center, and 3 for right
+    private int desiredTagNum = 0; // blue: 1,2,3; red: 4,5,6
+    private int checkStatus = 0;
+    final private double BUCKET_SHIFT = 2.0; // yellow pixel is in the right bucket.
     // USE LATER: boolean debug_flag = true;
 
     // Declare OpMode members.
     private final ElapsedTime runtime = new ElapsedTime();
     private intakeUnit intake;
-
     private MecanumDrive drive;
 
     // camera and sleeve color
     ObjectDetection.PropSide propLocation = ObjectDetection.PropSide.UNKNOWN;
-
     ObjectDetection propDetect;
     OpenCvCamera camera;
     String webcamName = "Webcam 1";
     boolean isCameraInstalled = true;
-
     // sensing april tag tools
     private AprilTagTest tag = null;
-    /**
-     * blue: 1,2,3; red: 4,5,6
-     */
-    private int desiredTagNum = -1; // blue: 1,2,3; red: 4,5,6
 
     // road runner variables
     Pose2d startPose;
 
-    final int WAIT_ALLIANCE_SECONDS = 1;
+    final int WAIT_ALLIANCE_SECONDS = 3;
 
     /**
      * Set robot starting location on the field:
@@ -202,6 +205,7 @@ public class AutoRedFront extends LinearOpMode {
         // init drive with road runner
         drive = new MecanumDrive(hardwareMap, startPose);
         Params.currentPose = startPose; // init storage pose.
+        Params.blueOrRed = blueOrRed;
 
         intake = new intakeUnit(hardwareMap, "ArmMotor", "WristServo",
                 "FingerServo", "SwitchServo");
@@ -215,8 +219,9 @@ public class AutoRedFront extends LinearOpMode {
 
         while (!isStarted()) {
             propLocation = propDetect.getPropPos();
-            //propLocation = ObjectDetection.PropSide.CENTER; // TODO: remove after temp test
+            //propLocation = ObjectDetection.PropSide.LEFT; // TODO: remove after temp test
 
+            int spikeMarkLoc = 1; // 1 for left, 2 for center, and 3 for right
             switch (propLocation) {
                 case LEFT:
                     spikeMarkLoc = 1;
@@ -230,6 +235,7 @@ public class AutoRedFront extends LinearOpMode {
                     break;
             }
             desiredTagNum = spikeMarkLoc + (3 - blueOrRed * 3) / 2; // blue: 1,2,3; red: 4,5,6
+            checkStatus = desiredTagNum * frontOrBack;
 
             telemetry.addData("Detected Prop location: ", propLocation);
             telemetry.addData("Desired Tag ID: ", "%d", desiredTagNum);
@@ -254,6 +260,7 @@ public class AutoRedFront extends LinearOpMode {
 
             autonomousCore();
 
+            Params.currentPose = drive.pose; // storage end pose of autonomous
             intake.parkingPositions(); // Motors are at intake positions at the beginning of Tele-op
             intake.fingerStop();
             sleep(1000);
@@ -265,141 +272,147 @@ public class AutoRedFront extends LinearOpMode {
 
     private void autonomousCore() {
         autoCore();
+        intake.armMotor.setZeroPowerBehavior(DcMotor.ZeroPowerBehavior.FLOAT);
     }
 
     private void autoCore() {
-        int checkStatus = desiredTagNum * frontOrBack;
+        Vector2d startArmFlip = new Vector2d(startPose.position.x - blueOrRed * 6, startPose.position.y);
 
-        if ((6 == checkStatus) || (-4 == checkStatus) || (1 == checkStatus) ||(-3 == checkStatus))
-        {
-            return;
-        }
         double pausePoseY = -2 * Params.HALF_MAT - 6;
         Vector2d vMatCenter = new Vector2d(blueOrRed * 3 * Params.HALF_MAT, startPose.position.y);
-        Vector2d vParkPos = new Vector2d(blueOrRed * ((3 - 2 * frontOrBack) * Params.HALF_MAT + 2), -3.5 * Params.HALF_MAT);
+        Vector2d vParkPos = new Vector2d(blueOrRed * ((3 - 2 * frontOrBack) * Params.HALF_MAT - frontOrBack * ((frontOrBack > 0)? 0 : 3)), -3.5 * Params.HALF_MAT);
         Vector2d vBackdrop = new Vector2d(blueOrRed * 3 * Params.HALF_MAT, -4 * Params.HALF_MAT);
 
         Vector2d vAprilTag = null;
-        double rightBucketShift = 2.0; // yellow pixel is in the right bucket.
+
         if (blueOrRed > 0) {
-            vAprilTag = new Vector2d(vBackdrop.x + (desiredTagNum - 2) * Params.BACKDROP_SIDEWAYS, vBackdrop.y);
+            vAprilTag = new Vector2d(vBackdrop.x + (2 - desiredTagNum) * Params.BACKDROP_SIDEWAYS, vBackdrop.y);
         }
         else {
             vAprilTag = new Vector2d(vBackdrop.x + (5 - desiredTagNum) * Params.BACKDROP_SIDEWAYS, vBackdrop.y);
         }
         Vector2d vCheckingAprilTagPose = new Vector2d(vAprilTag.x, vAprilTag.y + 10);
-        Vector2d vDropYellow = new Vector2d(vAprilTag.x + rightBucketShift, vAprilTag.y);
+        Vector2d vDropYellow = new Vector2d(vAprilTag.x + BUCKET_SHIFT, vAprilTag.y);
 
         Vector2d vDropPurple = null;
         double xDelta = -3.0;
         double yDelta = 10.0;
 
         switch (checkStatus) {
-            case 1:
-                if (frontOrBack > 0) {
-
-                }
-                break;
-            case -1:
-                    xDelta = 9.0;
-                    yDelta = 10.0;
-                break;
-
             case 5:
             case -5:
             case 2:
             case -2:
-                xDelta = 5.5;
-                yDelta = (frontOrBack > 0)? 5.0 : 0;
+                // pass the test
+                xDelta = 5.0;
+                yDelta = (frontOrBack > 0) ? 5.0 : 0;
                 break;
-            case 3:
-            case -3:
-                break;
-
+            case -1:
             case 4:
-                    xDelta = 8.0;
-                    yDelta = 8.5;
+                // pass the test
+                xDelta = 8.0;
+                yDelta = 10.0;
                 break;
+            case -3:
+            case 1:
             case -4:
             case 6:
-                    xDelta = -3;
-                    yDelta = -10.0;
+                xDelta = -4; // 0;
+                yDelta = 3;//5;
+                startArmFlip = new Vector2d(blueOrRed * (3 * Params.HALF_MAT + xDelta), startPose.position.y + frontOrBack * 10);
                 break;
+            case 3:
             case -6:
-                    xDelta = 8.0;
-                    yDelta = 15.0;
+                // pass the test
+                xDelta = 8.0;
+                yDelta = 15.0;
                 break;
         }
         vDropPurple = new Vector2d(blueOrRed * (3 * Params.HALF_MAT + xDelta), startPose.position.y + frontOrBack * yDelta);
 
+        Logging.log("check status = %d, xDelta = %.2f, yDelta = %.2f ", checkStatus, xDelta, yDelta);
+        logVector("Back drop pose", vBackdrop);
+        logVector("April tag", vAprilTag);
 
-        Logging.log("red backdrop pose y: %2f", vBackdrop.y);
-        Logging.log("code number 4 x: %2f", vAprilTag.x);
-        Logging.log("code number 4 y: %2f", vAprilTag.y);
-        Logging.log(" desired tag = %d, frontOrBack = %d, xDelta = %.2f, yDelta = %.2f ", desiredTagNum, frontOrBack, xDelta, yDelta);
-
-        Logging.log("robot drive: before strafe pos heading : %.2f", Math.toDegrees(drive.pose.heading.log()));
-        Logging.log("robot drive: before strafe imu heading : %.2f", drive.imu.getRobotYawPitchRollAngles().getYaw(AngleUnit.DEGREES));
-
-        Logging.log("robot drive: start position: x=%.2f, y=%.2f", drive.pose.position.x, drive.pose.position.y);
+        logRobotHeading("robot drive: before strafe");
+        logVector("robot drive: start position", startPose.position);
 
         // move forward
         Actions.runBlocking(
                 drive.actionBuilder(startPose)
-                        .lineToXConstantHeading(startPose.position.x - blueOrRed * 6) // drive forward 6 inch to leave wall
+                        .strafeTo(startArmFlip) // drive forward several inch to leave wall
                         .build()
         );
+
+        logVector("robot drive: arm to push pose", drive.pose.position);
+        logVector("robot drive: start Arm Flip pose required", startArmFlip);
+
+        // Near gate cases
+        if((6 == checkStatus) || (-3 == checkStatus) || (1 == checkStatus) || (-4 == checkStatus)) {
+            Actions.runBlocking(
+                    drive.actionBuilder(drive.pose)
+                            .turn(Math.PI / 2 * frontOrBack * blueOrRed)
+                            .build()
+            );
+            logRobotHeading("robot drive: after turn before arm flip");
+            logVector("robot drive: after turn pose starting Arm Flip required", drive.pose.position);
+            logVector("robot drive: after turn pose starting Arm Flip required", startArmFlip);
+        }
 
         intake.pushPropPose();
         sleep(2000);
 
-        if ((4 == checkStatus) || (5 == checkStatus) ||
-                (-5 == checkStatus) || (-6 == checkStatus) ||
-                (2 == checkStatus) || (3 == checkStatus) ||
-                (-2 == checkStatus) || (-1 == checkStatus)) {
-            Actions.runBlocking(
-                    drive.actionBuilder(drive.pose)
-                            .strafeTo(vDropPurple)
-                            .build()
-            );
-        }
+        Actions.runBlocking(
+                drive.actionBuilder(drive.pose)
+                        .strafeTo(vDropPurple)
+                        .build()
+        );
 
-        Logging.log("robot drive: after drop off purple x position: %.2f", drive.pose.position.x);
-        Logging.log("robot drive: after drop off purple required x position: %.2f", vDropPurple.x);
-        Logging.log("robot drive: after drop off purple y position: %.2f", drive.pose.position.y);
-        Logging.log("robot drive: after drop off purple required Y position: %.2f", vDropPurple.y);
-
-        Logging.log("robot drive: after turn pos heading : %2f", Math.toDegrees(drive.pose.heading.log()));
-        Logging.log("robot drive: after turn imu heading : %2f", drive.imu.getRobotYawPitchRollAngles().getYaw(AngleUnit.DEGREES));
+        logVector("robot drive: drop purple pose", drive.pose.position);
+        logVector("robot drive: drop purple pose required", vDropPurple);
 
         // drop off the purple pixel by arm and wrist actions
         dropPurpleAction();
 
-        if ((2 == checkStatus) || (5 == checkStatus)){
+        if ((2 == checkStatus) || (5 == checkStatus)) {
             intake.setArmModeRunToPosition(intake.ARM_POS_READY_FOR_HANG);
-        }
-        else {
+            sleep(1000);
+        } else {
             intake.underTheBeam();
+            sleep(300);
         }
-        sleep(1000);
 
-        // turn back and facing to backdrop board
-        if ((2 == spikeMarkLoc) || (1 == spikeMarkLoc)) { // center
+        // there is a bug somewhere in turn() function when using PI/2, it actually turn PI */
+        double turnAngleToDrop = 0;
+        if((-4 == checkStatus) || (-3 == checkStatus)) {
+            turnAngleToDrop = -blueOrRed * (Math.PI + 0.00001);
+
+            // move back a little bit before turn to avoid hitting gate
             Actions.runBlocking(
                     drive.actionBuilder(drive.pose)
-                            // there is a bug somewhere in turn()
-                            //   function when using PI/2, it actually turn PI */
-                            .turn((Math.PI / 2) * blueOrRed + 0.00001)
+                            .lineToYConstantHeading(drive.pose.position.y - 5)
                             .build());
+            logVector("robot drive: back after drop purple", drive.pose.position);
+            logVector("robot drive: back after drop purple required", vDropPurple);
+        } else {
+            turnAngleToDrop = (Math.PI / 2) * blueOrRed + 0.00001;
         }
 
-        intake.underTheBeam();
-        sleep(500);
+        if((6 != checkStatus) && (1 != checkStatus)) {
+            Actions.runBlocking(
+                    drive.actionBuilder(drive.pose)
+                            .turn(turnAngleToDrop)
+                            .build());
+            logRobotHeading("robot drive: turn after drop purple");
+            logVector("robot drive: turn after drop purple", drive.pose.position);
+            logVector("robot drive: turn after drop purple required", vDropPurple);
+        }
 
-        Logging.log("robot drive: after turn back pos heading : %2f", Math.toDegrees(drive.pose.heading.log()));
-        Logging.log("robot drive: after turn back imu heading : %2f", drive.imu.getRobotYawPitchRollAngles().getYaw(AngleUnit.DEGREES));
-        //drive.updatePoseEstimate();
-        Logging.log("robot drive: after turn head to backdrop x position: %2f", drive.pose.position.x);
+        // flip down the arm to get ready to go through the gate
+        if ((2 == checkStatus) || (5 == checkStatus)) {
+            intake.underTheBeam();
+            sleep(500);
+        }
 
         // move to the center of second mat to go through gate.
         if (frontOrBack > 0) {
@@ -408,91 +421,115 @@ public class AutoRedFront extends LinearOpMode {
                             .strafeTo(vMatCenter)
                             .build()
             );
-        }
 
-        sleep(1000);
+            logVector("robot drive: drive.pose move to 2nd mat center", drive.pose.position);
+            logVector("robot drive: move to 2nd mat center required", vMatCenter);
+        }
 
         // fine tune heading angle
         Actions.runBlocking(
-                drive.actionBuilder(drive.pose)
-                        .turn(-drive.pose.heading.log() - Math.PI / 2)
-                        .build());
-        Logging.log("robot drive: after strafe to mat center x position: %2f", drive.pose.position.x);
+                new ParallelAction(
+                        // Paral 1. turn on camera for april tag detect
+                        new TurnOnCamera(),
 
-        Logging.log("robot drive: after turn correction pos heading : %2f", Math.toDegrees(drive.pose.heading.log()));
-        Logging.log("robot drive: after turn correction imu heading : %2f", drive.imu.getRobotYawPitchRollAngles().getYaw(AngleUnit.DEGREES));
+                        // Paral 2.
+                        new SequentialAction(
+                                // Seq a. fine tune heading angle before long travel
+                                drive.actionBuilder(drive.pose)
+                                        .turn(-drive.pose.heading.log() - Math.PI / 2)
+                                        .build(),
 
-        if (frontOrBack > 0) {
-            sleep(WAIT_ALLIANCE_SECONDS * 100);
-        }
-        tag.initAprilTag();
+                                // Seq b. waiting alliance move out the way if at front side
+                                new SleepAction((frontOrBack > 0)? WAIT_ALLIANCE_SECONDS : 0),
 
-        // move forward to backdrop board
-        Actions.runBlocking(
-                drive.actionBuilder(drive.pose)
-                        .lineToYConstantHeading(pausePoseY)
-                        .strafeTo(vCheckingAprilTagPose)
-                        .build()
+                                // Seq c. strafe to april tag pose to check april tag
+                                drive.actionBuilder(drive.pose)
+                                        .lineToYConstantHeading(pausePoseY)
+                                        .strafeTo(vCheckingAprilTagPose)
+                                        .build()
+                        )
+                )
         );
+        logRobotHeading("robot drive: fine turn for heading correction");
+        logVector("robot drive: drive.pose check april tag", drive.pose.position);
+        logVector("robot drive: check april tag required", vCheckingAprilTagPose);
+        logRobotHeading("robot drive: check april tag");
 
-        Logging.log("robot drive: check april tag x position: %2f", drive.pose.position.x);
-        Logging.log("robot drive: check april tag y position: %2f", drive.pose.position.y);
-        Logging.log("robot drive: check april tag required y position: %2f", vCheckingAprilTagPose.y);
-
-        Logging.log("robot drive: arrive backdrop pos heading : %2f", Math.toDegrees(drive.pose.heading.log()));
-        Logging.log("robot drive: arrive backdrop imu heading : %2f", drive.imu.getRobotYawPitchRollAngles().getYaw(AngleUnit.DEGREES));
-        intake.readyToDropYellow();
+        if(intake.getArmPosition() > intake.ARM_POS_CAMERA_READ) {
+            intake.setArmCountPosition(intake.ARM_POS_CAMERA_READ); // lift arm to avoid blocking camera
+            sleep(500);
+        }
+        Pose2d aprilTagPose = tag.updatePoseAprilTag(desiredTagNum);
+        logVector("robot drive: april tag location from camera", aprilTagPose.position);
+        logVector("robot drive: drop yellow pose required before adjust", vDropYellow);
 
         // if can not move based on April tag, moved by road runner.
-        //if (!tag.autoDriveToAprilTag()) {
-        if (true) {
-            // shift to AprilTag
-                Actions.runBlocking(
-                        drive.actionBuilder(drive.pose)
-                                .strafeTo(vDropYellow)
-                                .build()
-                );
+        if (tag.targetFound) {
+            // adjust yellow drop-off position according to april tag location info from camera
+            vDropYellow = new Vector2d(drive.pose.position.x - aprilTagPose.position.x + BUCKET_SHIFT,
+                    drive.pose.position.y - aprilTagPose.position.y + Params.AUTO_DISTANCE_TO_TAG);
+            logVector("robot drive: drop yellow pose required after april tag adjust", vDropYellow);
         }
-        Logging.log("robot drive: arrive backdrop x position: %2f", drive.pose.position.x);
-        Logging.log("robot drive: arrive backdrop vAprilTag x position: %2f", vAprilTag.x);
 
-        Logging.log("robot drive: arrive backdrop y position: %2f", drive.pose.position.y);
-        Logging.log("robot drive: arrive backdrop vAprilTag y position: %2f", vAprilTag.y);
-        Logging.log("robot drive: arrive backdrop required position: x=%2f, y=%2f", vDropYellow.x, vDropYellow.y);
+        intake.readyToDropYellow();
 
+        // shift to AprilTag
+        Actions.runBlocking(
+                drive.actionBuilder(drive.pose)
+                        .strafeTo(vDropYellow)
+                        .build()
+        );
+        logVector("robot drive: drive.pose drop yellow", drive.pose.position);
+        logVector("robot drive: check drop yellow required", vDropYellow);
+
+        logVector("robot drive: april tag required", vAprilTag);
 
         // drop pixel
         dropYellowAction();
 
-        intake.setArmModeRunToPosition(intake.ARM_POS_DROP); // lift arm to ensure yellow pixel is dropped.
-        sleep(500);
-
-        Logging.log("robot drive: drop yellow x position: %2f", drive.pose.position.x);
         Actions.runBlocking(
                 drive.actionBuilder(drive.pose)
                         .lineToYConstantHeading(vParkPos.y) //move back a little bit to left backdrop board.
                         .strafeTo(vParkPos)
                         .build()
         );
-
-        Logging.log("robot drive: parking x position: %2f", drive.pose.position.x);
+        logVector("robot drive: drive.pose parking", drive.pose.position);
+        logVector("robot drive: parking required", vParkPos);
     }
 
     private void dropPurpleAction() {
         // 1. arm and wrist at correct positions
         intake.readyToDropPurple();
-        sleep(2000);
+        sleep(500);
 
         // 2. open switch
         intake.setSwitchPosition(intake.SWITCH_RELEASE_PURPLE);
-        sleep(1500);
+        sleep(500);
     }
     private void dropYellowAction(){
         intake.readyToDropYellow();
-        sleep(500);
+        sleep(100);
         intake.setSwitchPosition(intake.SWITCH_RELEASE_YELLOW);
         sleep(500);
-        intake.setSwitchPosition(intake.getArmPosition() - 500);
+        intake.setArmCountPosition(intake.getArmPosition() - 500);
         sleep(500);
+    }
+
+    private void logVector(String sTag, Vector2d vXY) {
+        String vectorName = vXY.toString();
+        Logging.log("%s: %s", sTag, vectorName);
+    }
+
+    private void logRobotHeading(String sTag) {
+        Logging.log("%s drive.pose: %.2f", sTag, Math.toDegrees(drive.pose.heading.log()));
+        Logging.log("%s imu: %.2f", sTag, drive.imu.getRobotYawPitchRollAngles().getYaw(AngleUnit.DEGREES) - Math.toDegrees(startPose.heading.log()));
+    }
+
+    public class TurnOnCamera implements Action {
+        @Override
+        public boolean run(@NonNull TelemetryPacket telemetryPacket) {
+            tag.initAprilTag();
+            return false;
+        }
     }
 }
